@@ -1,0 +1,48 @@
+name: Build and Publish Docker images
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]
+env:
+  IMAGE_NAME: YOUR_DH_USER/your-repo
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - uses: docker/setup-qemu-action@v2
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Determine tag
+        id: tag
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "value=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "value=latest" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: Dockerfile.single
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:single-stage-${{ steps.tag.outputs.value }}
+            ${{ env.IMAGE_NAME }}:single-stage-latest
+
+      - uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: Dockerfile.multi
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:multi-stage-${{ steps.tag.outputs.value }}
+            ${{ env.IMAGE_NAME }}:multi-stage-latest
